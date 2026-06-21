@@ -1,0 +1,8 @@
+# Runtime scratch from post_flash_fixups.ps1 (HMS/us.db edit backups)
+_runtime/
+
+# Log export pulls and decrypt artifacts (may contain device serials)
+log_export/output/**
+!log_export/output/.gitkeep
+log_export/logutil_decrypt/obj/
+log_export/logutil_decrypt/libs/

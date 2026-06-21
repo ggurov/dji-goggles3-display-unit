@@ -1,0 +1,13 @@
+# Donor post-boot hook: run /data/local/donor/rc.local once camera service is up.
+# rc.local sleeps 30 s before stopping non-FPV services (boot init must finish first).
+# Delete /data/local/donor/rc.local to disable.
+
+service donor_boot_hook /system/bin/donor_boot_hook.sh
+    disabled
+    oneshot
+    user root
+    group root
+    seclabel u:r:dji_services:s0
+
+on property:dji.camera_service=1
+    start donor_boot_hook

@@ -37,7 +37,7 @@ override flag.
 To return to dev firmware at any time:
 
 ```powershell
-.\repro_kit\set_active_slot.ps1 -Slot 1 -Execute -Reboot
+.\set_active_slot.ps1 -Slot 1 -Execute -Reboot
 ```
 
 ---
@@ -64,28 +64,28 @@ To return to dev firmware at any time:
 
 ### v01.00.1300 (current — Avata 360 / 9 air units)
 
-Prebuilt images: `E:\dji_g3\fw_patch\images_1300\`
+Prebuilt images: `.\images_1300\` (create locally — not shipped in this repo)
 
 Source OTA: decrypt from DJI Assistant `firm_cache`:
 `1ed19cd27422aeccc8f73ce81f66498d.cache` (282 MB, `v10.00.59.40`, 2026-03-25).
-Decrypted copy: `fw_patch/retail_ota_1300/ota.zip`.
+Decrypted copy: `.\retail_ota_1300\ota.zip` (create locally).
 
 ```powershell
 # On-device decrypt (if rebuilding from firm_cache):
 adb push "<firm_cache>\1ed19cd27422aeccc8f73ce81f66498d.cache" /data/e3t_1300.fw.sig
 adb shell "dji_fw_verify -n 2805 -c 2805 -o /blackbox/ota_1300.zip /data/e3t_1300.fw.sig"
-adb pull /blackbox/ota_1300.zip fw_patch/retail_ota_1300/ota.zip
+adb pull /blackbox/ota_1300.zip .\retail_ota_1300\ota.zip
 
-# Rebuild images:
+# Rebuild images (requires build_images.py — see MANIFEST.md):
 pip install brotli
-python fw_patch/build_images.py fw_patch/retail_ota_1300/ota.zip fw_patch/images_1300
+python build_images.py .\retail_ota_1300\ota.zip .\images_1300
 ```
 
 See `MANIFEST.md` for SHA1 table and `unrd` descriptors.
 
 ### v01.00.1000 (older — 8 air units, superseded)
 
-Images: `fw_patch/images/`. Script: `flash_retail_to_inactive_slot.ps1`.
+Images: `.\images\` (v01.00.1000). Script: `flash_retail_to_inactive_slot.ps1`.
 Same procedure; use only if you specifically need the older retail build.
 
 ---
@@ -93,7 +93,7 @@ Same procedure; use only if you specifically need the older retail build.
 ## 2. Boot engineering OS before flashing (mandatory)
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File E:\dji_g3\repro_kit\set_active_slot.ps1 -Slot 1 -Execute -Reboot
+.\set_active_slot.ps1 -Slot 1 -Execute -Reboot
 ```
 
 Wait for ADB, then confirm:
@@ -112,10 +112,10 @@ adb shell id                                   # uid=0
 
 ```powershell
 # dry-run — must show: active=1, INACTIVE slot=2, writing to *_2 partitions
-powershell -ExecutionPolicy Bypass -File E:\dji_g3\repro_kit\flash_retail_v01_00_1300_to_inactive_slot.ps1
+.\flash_retail_v01_00_1300_to_inactive_slot.ps1 -ImagesDir .\images_1300
 
 # execute — writes + verifies readback + sets descriptors + flips active to slot 2
-powershell -ExecutionPolicy Bypass -File E:\dji_g3\repro_kit\flash_retail_v01_00_1300_to_inactive_slot.ps1 -Execute
+.\flash_retail_v01_00_1300_to_inactive_slot.ps1 -ImagesDir .\images_1300 -Execute
 ```
 
 Override paths if needed: `-Adb <path>` `-ImagesDir <path>`.
@@ -144,7 +144,7 @@ adb reboot
 **Or keep engineering as default boot** (retail staged but not active):
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File E:\dji_g3\repro_kit\set_active_slot.ps1 -Slot 1 -Execute
+.\set_active_slot.ps1 -Slot 1 -Execute
 adb reboot
 ```
 
@@ -180,9 +180,44 @@ Re-apply HMS suppression after **every** retail slot re-flash (lives in `/system
 `/data`). User confirmed capsule gone + **Avata 360** visible in bind list on v1300.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File E:\dji_g3\repro_kit\post_flash_fixups.ps1 -DoHms -Execute
+.\post_flash_fixups.ps1 -DoHms -Execute
 adb reboot
 ```
+
+### Donor RAM hygiene + GFSK shutdown (optional — IMU-less FPV-only units)
+
+**Recommended after retail slot-2 flash** if you fly FPV on a display unit. Mitigates
+~2–3 s video blackouts caused by `dji_media_server` iondma crashes (see
+[`DONOR_HYGIENE.md`](DONOR_HYGIENE.md)).
+
+**Delayed shutdown (30 s):** `camera3`, `upgrade`, `ftpd`, `amt`, `agent`, `arhome`,
+`gfsk_agent` must run through boot UI init (~8 s); rc.local then stops them. **Always
+keep running:** `dji_glasses`, `dji_media_server`, `dji_wlm`, `dji_sdrs_agent`,
+`dji_sw_uav`. Expect harmless `GfskManager` log noise after GFSK stop.
+
+```powershell
+.\install_donor_rc_local.ps1 -Execute -Reboot
+```
+
+Verify after boot:
+
+```powershell
+adb shell "grep 'donor rc.local' /blackbox/system/kmsg.log | tail -2"
+adb shell "getprop init.svc.dji_gfsk_agent init.svc.dji_media_server"
+```
+
+| Path | Role |
+|------|------|
+| `/data/local/donor/rc.local` | Policy — **persists across slot switches** |
+| `/system/bin/donor_boot_hook.sh` | Init wrapper — **reinstall after slot re-flash** |
+| `/system/etc/init/dji_donor_hygiene.rc` | Triggers on `dji.camera_service=1` |
+| [`DONOR_HYGIENE.md`](DONOR_HYGIENE.md) | Full findings, post-flight checklist |
+
+Disable hook only: `adb shell rm /data/local/donor/rc.local`  
+Full remove: `.\install_donor_rc_local.ps1 -Uninstall -Execute`
+
+**Field validation (2026-06-21):** flight0579 — ~46 min, video perfect, media_server pid
+stable, 0 iondma/SIGSEGV in kmsg with GFSK in hygiene.
 
 ---
 
@@ -206,6 +241,7 @@ Optional: full eMMC image (`dump_full_emmc.ps1`) before the first slot switch.
 - **9 air units** in `dji.json`: wa520/wa233/wa140 + wm1695/wa521/za530_lite/
   za530_pro/wa020/**wa530** (Avata 360 — confirmed in UI bind list).
 - IMU capsule suppressed on slot 2; OOBE bypass in `/data` (if applicable).
+- Optional: donor hygiene installed (`DONOR_HYGIENE.md`) for FPV blackout mitigation.
 
 ---
 

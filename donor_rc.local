@@ -1,0 +1,39 @@
+#!/system/bin/sh
+# Donor hygiene (IMU-less FPV unit). Installed to /data/local/donor/rc.local
+#
+# Boot-critical (must run through UI init ~8 s): camera3, upgrade, amt, agent, arhome.
+# Waits 30 s after hook fire, then stops non-FPV services (incl. gfsk_agent since 2026-06-20).
+# See DONOR_HYGIENE.md for rationale, post-flight checks, and blackout findings.
+# Delete this file to disable; init hook becomes a no-op.
+
+BOOTID=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null)
+MARKER=/data/local/donor/.hygiene_boot
+if [ -f "$MARKER" ] && [ "$(cat "$MARKER" 2>/dev/null)" = "$BOOTID" ]; then
+    exit 0
+fi
+echo "$BOOTID" > "$MARKER"
+
+disable_donor_services() {
+    echo "donor rc.local: delayed disable camera3 upgrade ftpd amt agent arhome gfsk" > /dev/kmsg
+    setprop dji.camera_service 0
+    setprop dji.upgrade_service 0
+    setprop dji.ftpd_service 0
+    setprop dji.amt_service 0
+    setprop dji.agent_service 0
+    setprop dji.arhome_service 0
+    setprop dji.gfsk_agent_service 0
+    stop dji_camera3 2>/dev/null
+    stop dji_upgrade 2>/dev/null
+    stop dji_ftpd 2>/dev/null
+    stop dji_amt 2>/dev/null
+    stop dji_agent 2>/dev/null
+    stop dji_arhome 2>/dev/null
+    stop dji_gfsk_agent 2>/dev/null
+}
+
+echo "donor rc.local: scheduling hygiene in 30 s" > /dev/kmsg
+
+(
+    sleep 30
+    disable_donor_services
+) &

@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "goggles-tool"
+version = "0.1.0"
+description = "DJI Goggles 3 USB control CLI (Assistant bulk-path replacement)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pyusb>=1.2.1",
+    "libusb-package>=1.0.26",
+]
+
+[project.scripts]
+goggles-tool = "goggles_tool.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["goggles_tool*"]

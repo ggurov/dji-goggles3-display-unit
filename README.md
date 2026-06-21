@@ -46,6 +46,13 @@ copyrighted binaries — you obtain those yourself from DJI Assistant 2.
    `/data/upgrade/device_info.json` cache. The **bind list and actual air-unit support
    reflect the real flashed firmware.**
 
+7. **Mid-flight video blackout (display units, Jun 2026).** Some units hit ~2–3 s screen
+   blackouts caused by `dji_media_server` crashing in an ION DMA thread — not RF loss.
+   **Delayed hygiene** that stops non-FPV services (including **`dji_gfsk_agent`**) after
+   boot, plus a **cold reboot before flying**, is a working mitigation. First validated
+   field flight: **46 min, video perfect** (flight0579, 2026-06-21). See
+   [`DONOR_HYGIENE.md`](DONOR_HYGIENE.md).
+
 ---
 
 ## What you need
@@ -65,6 +72,9 @@ copyrighted binaries — you obtain those yourself from DJI Assistant 2.
 - **DJI Assistant 2 (Consumer Drones Series)** — to download the signed firmware package
 - **Python 3** + `pip install brotli` — only if you need to rebuild flash images from
   the decrypted OTA zip
+- **Python 3.10+** + `pip install -e goggles_tool` — for retail bulk log export
+  ([`log_export/README.md`](log_export/README.md)); requires DJI Assistant installed
+  (libusb0 DLL) and optional Android NDK for decrypt harness
 
 ### Materials NOT in this repository
 
@@ -92,11 +102,43 @@ Internal name: `zv902_2805_v10.00.59.40_20260325.ar0.pro.fw.sig` (282,358,176 by
 |---|---|
 | [`RUNBOOK.md`](RUNBOOK.md) | Detailed step-by-step procedure |
 | [`MANIFEST.md`](MANIFEST.md) | Image SHA1 table, `unrd` descriptor values, rebuild instructions |
+| [`DONOR_HYGIENE.md`](DONOR_HYGIENE.md) | RAM/GFSK shutdown + video blackout findings (optional, post-flash) |
 | [`AGENTS.md`](AGENTS.md) | Full technical brief for developers / AI agents |
 | `set_active_slot.ps1` | Switch which A/B slot boots (via `unrd`) |
 | `flash_retail_v01_00_1300_to_inactive_slot.ps1` | Flash **v01.00.1300** to the inactive slot |
 | `flash_retail_to_inactive_slot.ps1` | Flash **v01.00.1000** (older; superseded) |
 | `post_flash_fixups.ps1` | Optional OOBE + sensor-error fixes for IMU-missing units |
+| `install_donor_rc_local.ps1` | Install delayed RAM/GFSK hygiene hook |
+| `donor_rc.local` | Hygiene policy (installed to `/data/local/donor/rc.local`) |
+| `donor_boot_hook.sh` | Init wrapper for rc.local |
+| `dji_donor_hygiene.rc` | Init trigger on `dji.camera_service=1` |
+| [`log_export/`](log_export/) | **Retail bulk log pull + LOGH decrypt** (see below) |
+| [`goggles_tool/`](goggles_tool/) | USB bulk CLI (`pip install -e goggles_tool`) |
+
+---
+
+## Log export & decrypt (retail unit, no ADB)
+
+Pull blackbox logs from a **retail** Goggles 3 over USB bulk (same path as DJI Assistant),
+decrypt **LOGH** ciphertext on a **rooted engineering donor** via `liblog_util.so`.
+
+| Topic | Doc |
+|-------|-----|
+| Quick start | [`log_export/README.md`](log_export/README.md) |
+| LOGH / encryption | [`log_export/LOG_ENCRYPTION.md`](log_export/LOG_ENCRYPTION.md) |
+| Bulk USB protocol | [`log_export/BULK_PROTOCOL.md`](log_export/BULK_PROTOCOL.md) |
+
+```powershell
+pip install -e goggles_tool
+python log_export\pull_log_index.py --list
+python log_export\pull_log_index.py --flight 235 --no-decrypt
+python log_export\batch_decrypt.py bulk log_export\output\pull_*\files
+```
+
+**Findings:** Logs are plaintext on eMMC; retail bulk export wraps them in **LOGH + AES**.
+Engineering donors skip encryption (`secure_debug=1`). Decrypt uses an NDK harness
+(`log_export/logutil_decrypt/`) calling `log_decrypt_fragment` on the donor — no
+standalone decrypt binary exists on-device.
 
 ---
 
@@ -189,6 +231,20 @@ adb reboot
 Requires `remove_hms_entry.py` and (for OOBE) `add_novice_guidance.py` in the
 `-Tools` directory.
 
+### 7. Optional FPV hygiene + GFSK shutdown (IMU-less display units)
+
+If you use the goggles for **field FPV** and see occasional ~2–3 s video blackouts,
+install the delayed hygiene hook. It stops non-essential services (including
+`dji_gfsk_agent`) 30 s after boot to reduce `dji_media_server` crash risk. Liveview
+keeps working; expect harmless `GfskManager` log noise.
+
+```powershell
+.\install_donor_rc_local.ps1 -Execute -Reboot
+```
+
+Full rationale, post-flight checks, and flight0579 validation:
+[`DONOR_HYGIENE.md`](DONOR_HYGIENE.md).
+
 ### Revert to engineering firmware any time
 
 ```powershell
@@ -248,6 +304,10 @@ firm_cache\95714dcbe1a9f75ee8dde5f84fbe27eb.cache
 
 - **[RUNBOOK.md](RUNBOOK.md)** — complete procedure with per-unit safety snapshots
 - **[MANIFEST.md](MANIFEST.md)** — SHA1 hashes, `unrd` slot descriptors, rebuild commands
+- **[DONOR_HYGIENE.md](DONOR_HYGIENE.md)** — optional RAM/GFSK shutdown, video blackout
+  mitigation, post-flight checklist
+- **[log_export/README.md](log_export/README.md)** — retail bulk log pull + LOGH decrypt
+- **[log_export/LOG_ENCRYPTION.md](log_export/LOG_ENCRYPTION.md)** — encryption pipeline
 - **[AGENTS.md](AGENTS.md)** — deep technical reference (boot architecture, component
   model, open research questions)
 

@@ -10,29 +10,41 @@ safety constraints. Read this file and `AI_SEED.txt` before acting.
 
 ---
 
-## 0. Status banner (2026-06-16) — Phase 1+ complete; dual-slot retail on donor
+## 0. Status banner (2026-06-21) — Phase 1+ complete; dual-slot retail + FPV hygiene
 
 Phase 1 goal (expand air-unit support beyond `wa520/wa233/wa140`) achieved via **manual
-retail A/B-slot flashes while keeping root**. Donor unit now runs **v01.00.1300**
+retail A/B-slot flashes while keeping root**. Donor unit runs **v01.00.1300**
 (build **29020**, Mar 2026) on **slot 2** with **9** air units incl. **Avata 360**
 (`wa530`). **Slot 1** permanently holds the original engineering build **9998** as
 the always-bootable dev fallback — never overwritten.
 
+**FPV hygiene (2026-06-20+):** delayed shutdown of non-FPV services incl.
+**`dji_gfsk_agent`** via `/data/local/donor/rc.local` — mitigates `dji_media_server`
+iondma blackouts. **flight0579 (2026-06-21):** ~46 min field flight, video perfect.
+See `DONOR_HYGIENE.md`.
+
 **Canonical upgrade policy (shareable):** boot slot 1 (engineering) → flash inactive
 slot 2 with latest retail → reboot into slot 2 when ready. Repeat for future OTAs.
-See `repro_kit/RUNBOOK.md` §"Slot policy".
+See `RUNBOOK.md` §"Slot policy".
 
 Current donor state:
 - Slot 2 active: retail v01.00.1300, `ro.dji.build.version=10.00.59.40`, root+ADB.
 - Slot 1 fallback: engineering 9998, bootable, untouched.
 - IMU capsule suppressed on slot 2; user confirmed Avata 360 in bind list + no capsule.
 - `/data` persisted across all slot switches (`novice_guidance=1` OOBE bypass).
+- Hygiene: camera3/upgrade/ftpd/amt/agent/arhome/**gfsk_agent** stopped @ t≈35 s.
 
-Repeatable kit: `repro_kit/` (`RUNBOOK.md`, `set_active_slot.ps1`,
-`flash_retail_v01_00_1300_to_inactive_slot.ps1`, `post_flash_fixups.ps1`, `MANIFEST.md`).
+Kit in this repo: `RUNBOOK.md`, `DONOR_HYGIENE.md`, `set_active_slot.ps1`,
+`flash_retail_v01_00_1300_to_inactive_slot.ps1`, `post_flash_fixups.ps1`,
+`install_donor_rc_local.ps1`, `MANIFEST.md`, `log_export/` (retail bulk pull +
+LOGH decrypt), `goggles_tool/` (USB bulk CLI).
 
-Phase 2 (open): add air units beyond retail via `dji_sdrs_agent` reverse; vendor bulk
-protocol; retail unit (no ADB) passive analysis only.
+**Log export (2026-06):** Retail bulk → LOGH ciphertext; donor bulk → plaintext
+(`secure_debug=1`). Decrypt via NDK harness + `liblog_util.so` on donor. See
+`log_export/LOG_ENCRYPTION.md`, `log_export/BULK_PROTOCOL.md`.
+
+Phase 2 (open): add air units beyond retail via modem personality reverse; retail unit
+(no ADB) passive analysis only.
 
 ---
 
