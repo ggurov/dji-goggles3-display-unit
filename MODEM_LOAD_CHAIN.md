@@ -146,6 +146,31 @@ exactly like the current 2024-10-16 retail one (442,336 B) — both `TBLD`/`0x3`
 This was an acceptance test; the mixed set was not booted, because rebooting the modem panics the
 AP (`boot reason : (SW AP Panic)` — recover with `start dji_sdrs_agent`, not a modem reboot).
 
+### Cross-product images do not work (G2 pigeon vs Sparrow2)
+
+The two goggle generations use different modem families, so a G2 `pigeon` image cannot run here:
+
+| | G3 `sparrow2/wa520/cp.img` | G2 `pigeon/cp.img` |
+|---|---|---|
+| container | `TBLD` | `TKRN` |
+| crypto | `auth_alg 0x3`, RSA-3072 | `auth_alg 0x2`, RSA-2048 |
+| chunks | 1 (`BLLK`) | 8 (`RTOS`, `M0IM`, `X164`, `X450`, `X451`, `SHRI`, `PHYS`, `RFNV`) |
+| size | 442,336 B | 6,001,024 B |
+| load map | `0x70000000` | RTOS `0x10020000`; DSPs `0x12804000`, `0x12a04000`, `0x12c04000` |
+| platform | `SPARROW2_ZV902`, LK `eagle-fpga` | pigeon |
+
+There is no `/vendor/modem_firmware/pigeon/` on a G3 (only `sparrow2/`); the `pigeon` entry in
+`dji.json` (`host 14`) is a routing host for the air-unit side, not the goggles' own modem; and
+`/system/bin/modem_ddr_load.sh` is a portable leftover that points at the missing pigeon path and
+uses pigeon partition names (`modem-package`, `modem-normal`) the Sparrow2 LK does not have.
+
+**This is not a safe experiment.** Even with `modem-pub_key` loaded — so a rejected image would
+never be executed — flashing a 6 MB pigeon `cp.img` to `modem-sparrow-cp` hung the fastboot write,
+wedged the modem, and took the AP down (`boot reason : (SW AP Panic)` / `(glb rst by ap sw)`).
+The automatic reboot re-flashed all twelve stock partitions (`Finished. Total time: 0.627s`) and
+the modem returned on `2ca3:1020` with its counters untouched, but the cost is a full AP panic and
+there is no upside to repeating it.
+
 ## 5. What the bootloader exposes
 
 Fastboot surface of `18d1:d00d`:
@@ -227,6 +252,7 @@ known. The experiment was reverted and the config hash checked.
 | downgrade to an older signed image | yes — no version check |
 | substitute the payload, the verify key, or a plaintext image | no — TBIE key is modem-side, plaintext containers are rejected |
 | obtain modem plaintext | no known AP-side path; only an event-triggered dump could, and it is not requestable with known tooling |
+| run a G2 pigeon image | no — different modem generation; the flash wedges the LK and panics the AP |
 
 ## 10. Safety
 
