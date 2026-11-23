@@ -2,7 +2,9 @@
 
 Companion to `FIRMWARE_CONTAINERS_AND_DUML.md`. Everything here was measured on a rooted
 Goggles 3 (retail **v01.00.1300 / 29020**, slot 2) and on the engineering build on slot 1
-(`00.08.14.05` / `3062`, Nov 2023). No modem flash, no OTP, no slot change.
+(`00.08.14.05` / `3062`, Nov 2023). The partition flashes described below go through the modem's
+own LK, just as they do at every boot; OTP, slot state and the boot ROM's persistent memory were
+never touched.
 
 The internal modem is a separate USB device ("C5") that enumerates on the AP's internal bus.
 It boots from the AP on every power-up: the AP uploads its bootloader and re-flashes twelve
@@ -88,6 +90,62 @@ key slots.
 Caution for anyone repeating this: on-device `dd … conv=notrunc` silently does nothing on this
 platform. Patch on the host and verify the SHA-256 on the device before loading.
 
+### What signs the images
+
+| property | value |
+|---|---|
+| signature | 384-byte RSA-3072, key name `PRAK` (the factory flow loads `pro_prak_rsa3k.pub.mon`) |
+| G2 pigeon images | 256-byte RSA-2048 |
+| `auth_alg` | `0x3` for modem/module images, `0x40003` for the bootloader and boot images |
+| `anti_version` | 0 on every image examined |
+| coverage | signature sits at `header_size`; a header edit (version) with a repaired checksum fails while a pubkey is loaded, so the header is covered as well as the payload |
+
+### The internal checksum is keyless
+
+`encr_cksum` (header offset 108) is `~sum32_le(header with encr_cksum = 0 ‖ payload)`. It was
+reproduced byte-exact against a stock `wa520/cp.img` (`0xdacdeb14`), so a header edit can be made
+checksum-valid without any key. `plain_cksum` covers the decrypted data and cannot be recomputed
+without the TBIE key.
+
+### The partition gate is fail-open
+
+The LK checks partition signatures only after `modem-pub_key` has been flashed in the same
+session. `brload` and `fastboot` return 0 either way, so the exit codes prove nothing.
+
+| operation | no pubkey flashed | after `flash modem-pub_key` |
+|---|---|---|
+| stock `cp.img` | OKAY | OKAY |
+| signature zeroed | **OKAY** | FAILED (`unknown reason`) |
+| `version` edited + checksum repaired | **OKAY** | FAILED |
+| chunk load address retargeted + checksum repaired | **device dropped** (LK faulted at the chosen address) | not run |
+| plaintext container (`enc_key` empty) | **FAILED** (LK survived) | — |
+| older signed image (2023-11-06 vs 2024-10-16) | — | **OKAY** |
+
+So a host that controls the flash sequence can skip the pubkey and write images that were never
+signature-checked, and the LK loads the chunk to the header-supplied address. Payload
+substitution still needs the TBIE key; a plaintext container is rejected outright.
+
+### The pubkey cannot be replaced
+
+| blob flashed | pubkey write | stock `cp` after | zeroed-signature `cp` after |
+|---|---|---|---|
+| stock | OKAY | OKAY | FAILED |
+| container signature zeroed | **OKAY** | OKAY | FAILED |
+| `BLFA` anchor zeroed | **OKAY** | OKAY | FAILED |
+| whole blob zeroed | **OKAY** | **FAILED** | FAILED |
+
+The partition is not authenticated at flash time (any bytes are accepted), but the LK does use it:
+a fully zeroed blob makes even the genuine image fail. Tampering with the container signature or
+the `BLFA` anchor changes nothing, so the key material lives inside the encrypted `BLLK` payload.
+
+### No anti-rollback
+
+With verification active, a **2023-11-06** engineering `wa520/cp.img` (433,408 B) was accepted
+exactly like the current 2024-10-16 retail one (442,336 B) — both `TBLD`/`0x3`/`TBIE`, one
+`BLLK` chunk at `0x70000000`, `version = 0`, `anti_version = 0`. The LK compares no versions.
+This was an acceptance test; the mixed set was not booted, because rebooting the modem panics the
+AP (`boot reason : (SW AP Panic)` — recover with `start dji_sdrs_agent`, not a modem reboot).
+
 ## 5. What the bootloader exposes
 
 Fastboot surface of `18d1:d00d`:
@@ -165,10 +223,15 @@ known. The experiment was reverted and the config hash checked.
 | replace the PRAK key / change lifecycle / burn OTP | factory paths exist; trust-state, OTP one-time |
 | load a custom bootloader | no — the ROM verifies |
 | modify NVRAM (calibration/personality) | yes, by design |
+| tamper with header fields / retarget the load address | yes, if the pubkey is never flashed (verification is fail-open) |
+| downgrade to an older signed image | yes — no version check |
+| substitute the payload, the verify key, or a plaintext image | no — TBIE key is modem-side, plaintext containers are rejected |
 | obtain modem plaintext | no known AP-side path; only an event-triggered dump could, and it is not requestable with known tooling |
 
 ## 10. Safety
 
-Everything above was read-only on the modem except the reset/`brload` cycles, which the AP
-performs at every boot anyway. The one configuration experiment was reverted with a hash check.
-Never touch `bootarea`/`env`/`gpt` partitions, never run `amt_test_cmd`, and never burn OTP.
+Every test above flashed modem partitions through the LK, exactly as the AP does at every boot;
+OTP, `bootarea`/`env`/`gpt` and the eMMC boot area were never touched. Each experiment was
+recovered with `start dji_sdrs_agent` (the normal boot reflash) and the modem verified back on
+`2ca3:1020`. Do not reboot the modem from fastboot (it panics the AP), never run `amt_test_cmd`,
+and never burn OTP.

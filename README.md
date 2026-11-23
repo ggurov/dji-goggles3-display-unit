@@ -309,7 +309,9 @@ firm_cache\95714dcbe1a9f75ee8dde5f84fbe27eb.cache
   boot-time `2CA3:0040`, DUSS host map and read-only DUML probes
 - **[MODEM_LOAD_CHAIN.md](MODEM_LOAD_CHAIN.md)** — Sparrow2 modem boot states, `brload`/LK
   fastboot surface, where the TBIE key lives, the ROM's bootloader verification, factory
-  `cmpu_*` paths, personality switch mechanics, and the BULKMT channels/dump protocol
+  `cmpu_*` paths, personality switch mechanics, the BULKMT channels/dump protocol, and the
+  image-signing scheme (RSA-3072 `PRAK`), fail-open flash gate, keyless checksum and rollback
+  behaviour
 - **[DONOR_HYGIENE.md](DONOR_HYGIENE.md)** — optional RAM/GFSK shutdown, video blackout
   mitigation, post-flight checklist
 - **[log_export/README.md](log_export/README.md)** — retail bulk log pull + LOGH decrypt
