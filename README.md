@@ -315,6 +315,9 @@ firm_cache\95714dcbe1a9f75ee8dde5f84fbe27eb.cache
 - **[LIVEVIEW_CAPTURE.md](LIVEVIEW_CAPTURE.md)** — dumpframe capture of the live plane (NV12,
   throughput), why the UVC gadget enumerates but sends nothing (media-server work-mode gate), and
   the USB-networking + UDP protocol CosmoViewer/Streamer uses
+- **[NETWORK_ATTACK_SURFACE.md](NETWORK_ATTACK_SURFACE.md)** — every listener on the USB network
+  (ports, owners, root), verified wire formats, the unauthenticated I2C daemon, the 9003/8902
+  session issues, and the one-packet `7400` DDS crash (DoS, not a controllable call)
 - **[DONOR_HYGIENE.md](DONOR_HYGIENE.md)** — optional RAM/GFSK shutdown, video blackout
   mitigation, post-flight checklist
 - **[log_export/README.md](log_export/README.md)** — retail bulk log pull + LOGH decrypt
