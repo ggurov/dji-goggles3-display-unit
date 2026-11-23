@@ -307,6 +307,9 @@ firm_cache\95714dcbe1a9f75ee8dde5f84fbe27eb.cache
 - **[FIRMWARE_CONTAINERS_AND_DUML.md](FIRMWARE_CONTAINERS_AND_DUML.md)** — IM\*H container
   classes, what `dji_fw_verify` accepts on a Goggles 3 (and why a G2 module does not),
   boot-time `2CA3:0040`, DUSS host map and read-only DUML probes
+- **[MODEM_LOAD_CHAIN.md](MODEM_LOAD_CHAIN.md)** — Sparrow2 modem boot states, `brload`/LK
+  fastboot surface, where the TBIE key lives, the ROM's bootloader verification, factory
+  `cmpu_*` paths, personality switch mechanics, and the BULKMT channels/dump protocol
 - **[DONOR_HYGIENE.md](DONOR_HYGIENE.md)** — optional RAM/GFSK shutdown, video blackout
   mitigation, post-flight checklist
 - **[log_export/README.md](log_export/README.md)** — retail bulk log pull + LOGH decrypt

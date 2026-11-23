@@ -52,8 +52,10 @@ Useful error codes seen here:
 ```
 
 - **Goggle modules:** `-n 2805 -c 2805` (name and chunk id are both `2805`).
-- **Modem images:** `-n cp` (or `ap`/`dsp`/`l1c`/`scp`) and **no `-c`** — adding
-  `-c BLLK` turns a passing `wa520/cp.img` into a failure.
+- **Modem images:** `-n cp` (or `ap`/`dsp`/`scp`) and **no `-c`** works. `-c` is **not** a
+  chunk selector: a value that names a chunk which actually exists in the container (e.g.
+  `-c BLLK` on `wa520/cp.img`) makes a passing verify fail, while a value naming something
+  absent (`-c RTOS`, `-c cp`) is ignored and the verify still passes. Measured 2026-11-23.
 - `-d/-D` is not a key-existence oracle on this build: every form tried
   (`-d UFIE`, `-d UFIE-2021-08`, `-d TBIE-2021-08`, `-d UFIE -D 2021-08`) fails at
   `fw_util_verify_init` with `ret:-65530`.
@@ -61,7 +63,11 @@ Useful error codes seen here:
 ### Output notes
 
 - Genuine `ZV90` goggle modules decrypt to a real zip (`PK\x03\x04`), not zero-filled.
-- Modem images can report `verify pass` while the output is zero-filled (TA-side quirk).
+- **Every modem/boot-chain container the TA accepts writes an all-zero output file.** Measured
+  2026-11-23 on build 29020, byte-exact: `wa520/cp.img` → 441,720 B out, **0** non-zero, while
+  the source `BLLK` chunk is 99.6 % non-zero; `ap` 325,436 / `dsp` 244,800 / `scp` 46,188 /
+  boot-chain `scp` 81,344 — all 0 non-zero. `verify pass` here means signature check only, so
+  treat exit code 0 as meaningless for these classes and measure the output.
 
 ---
 
@@ -86,18 +92,85 @@ is the quickest way to dump the fields that matter:
 
 ### What verifies on a Goggles 3
 
-| container | type | auth_alg | enc_key | result |
-|---|---|---|---|---|
-| G3 goggle module (eng 2023 / 2025, retail v1300) | `ZV90` | `0x3` | — | **pass**, real zip |
-| G3 boot images (`normal`, `tos`, `scp`) | `TKRN`/`TSCP` | `0x40003` | `TBIE` | used by the boot chain, not by `dji_fw_verify` |
-| modem images | `TBLD`/`TSCP` | `0x3` | `TBIE` | pass (single chunk) |
-| **Goggles 2 main module v10.00.81.97** | **`E3T`** | **`0x40003`** | **`UFIE`** | **fail** (`BAD_STATE`) |
+| container | type | auth_alg | enc_key | chunks | result |
+|---|---|---|---|---|---|
+| G3 goggle module (eng 2023 / 2025, retail v1300) | `ZV90` | `0x3` | — | 1 | **pass**, real zip |
+| G3 boot-chain `scp` | `TSCP` | `0x40003` | `TBIE` | 1 | pass, **zeros** |
+| G3 boot-chain `tos` / `normal` | `TKRN` | `0x40003` | `TBIE` | 2 / 21 | **fail** `NOT_SUPPORTED` |
+| G3 modem `wa520/{cp,ap,dsp}`, `scp` | `TBLD`/`TSCP` | `0x3` | `TBIE` | 1 | pass, **zeros** |
+| G3 modem 2-chunk variants (`cp.img` `BLLK`+`CP2`, `l1c.img`) | `TBLD` | `0x3` | `TBIE` | 2 | **fail** `NOT_SUPPORTED` |
+| G2 pigeon `cp`/`share_info` (4 files, 2026-11-23) | `TKRN` | **`0x2`** | `TBIE` | 8 / 1 | **fail** `NOT_SUPPORTED` |
+| **Goggles 2 main module v10.00.81.97** | **`E3T`** | **`0x40003`** | **`UFIE`** | 1 | **fail** (`BAD_STATE`) |
+
+The TA accepts **single-chunk containers only** — every multi-chunk image tried (boot-chain
+`tos`, `normal`, the two-chunk modem variants, and the G2's 8-chunk pigeon files) fails at
+`fw_invoke_verify_update` with `0xFFFF000A` (`TEE_ERROR_NOT_SUPPORTED`, origin 4), regardless
+of name or `-c`. The G2 pigeon containers fail with exactly the code the G2 itself returns,
+so there is **no** G3-as-decryption-oracle capability difference.
 
 Takeaway: the G2 — an older product — ships a **newer** goggle-module container generation
 (`E3T` + `0x40003` + `UFIE`) than the G3, whose modules are `ZV90`/`0x3`/plaintext. A rooted
 Goggles 3 cannot decrypt it. The TA's key table lives inside the IM\*H-wrapped `tos.img`
 (`TKRN`, enc `TBIE`) and is not readable from userspace; `UFIE` appears nowhere in G3
 userspace or the system/vendor images.
+
+### Goggles 2 pigeon modem containers (2026-11-23 request)
+
+A G2 researcher asked whether a G3 can decrypt the G2's `pigeon` modem images, on the theory
+that `wa520` is the same modem on both products. Four factory containers were supplied and
+tested, all `TKRN` / `auth_key=PRAK` / `enc_key=TBIE` / header v2:
+
+| file | bytes | `auth_alg` | chunks |
+|---|---|---|---|
+| pigeon default `cp` | 6,001,024 | `0x00000002` | 8 (`RTOS` 0x3771bc + M0IM/X164/X450/X451/SHRI/PHYS/RFNV) |
+| pigeon `wa520` `cp` | 6,088,288 | `0x00000002` | 8 (`RTOS` 0x3861dc) |
+| `wm169_unit` `cp` | 6,105,184 | `0x00000002` | 8 (`RTOS` 0x377668) |
+| pigeon `share_info` | 544 | `0x00000002` | 1 (`SHRI`) |
+
+Result: **all four fail** (`-n cp` / `-n share_info`, with and without `-c <chunk>`, `-n
+ap/dsp/l1c/scp`, `-s 8`) with `0xFFFF000A` at `fw_invoke_verify_update` — the same
+`TEE_ERROR_NOT_SUPPORTED` the G2 returns for the same files. Note `auth_alg` is `0x2`, not
+`0x40003`: this is an older container generation than the G3's boot images.
+
+The request's premise — "the G3 decrypts a `wa520/cp.img`" — conflates the name. The G3's
+`wa520/cp.img` is a 442,336-byte `TBLD` / single-`BLLK` DDR blob (load `0x70000000`), not the
+G2's 6 MB `TKRN` eight-chunk image with RTOS at `0x10020000` and DSPs at `0x12804000` /
+`0x12a04000` / `0x12c04000`. And that G3 pass writes zeros (see §1 output notes), so no G3
+plaintext has ever been produced for a modem class. Conclusion: the G2 `cp.img` is decrypted
+by whatever loads it on the G2 (boot chain / modem loader), not by the AP trusted application
+on either product.
+
+**Repeated in a full normal boot** (`ro.bootmode=normal`, `dji_glasses`/`media_server`/`wlm`/
+`sdrs_agent` running), same build/slot/files: identical. All four G2 containers still fail
+(`0xffff000a`; `share_info` returns a raw negative code that varied `-4` / `-14` between boots),
+and the zero-fill outputs are **byte-identical** across boot modes — `wa520/cp.img` sha256
+`07cb8155…`, `dsp` `ded7839a…`, boot `scp` 81,344 B all-zero. So boot mode is not a factor.
+
+**Positive control in the same normal boot:** a genuine `ZV90` module (232,263,936 B, payload
+digest valid, `-n 2805 -c 2805`) → verify pass, 232,263,298 B output, **99.6 % non-zero**,
+`PK\x03\x04`, valid zip with 15 entries. The tool does emit plaintext for classes the TA
+accepts; zeros are specific to modem/boot-chain classes.
+
+**Payload-digest check matters:** all four G2 files and the G3's own images pass the header
+`payload_digest` (SHA-256 of the payload), so they are intact and their rejection is genuine.
+An earlier `0xfffffff3` on a 282 MB module was a **bad input** — that file was cut from a USB
+bulk capture and fails its own payload digest. Verify the digest before blaming the TA.
+
+**Engineering slot tested too.** Booted slot 1 (`00.08.14.05` / `3062`, Nov 2023) in normal
+mode: same `dji_fw_verify` binary (`sha256 913b32cd…`), different TA (`libfw_util.so`,
+log line numbers `:589` vs `:613`) and a 3-entry `/vendor` (`wa140`/`wa233`/`wa520`).
+Results identical — all four pigeon files fail `0xffff000a`, every modem/boot-class pass is
+**all-zero** (434,656 / 283,972 / 357,824 / 57,552 / 96,560 B), `l1c` fails, and the genuine
+`ZV90` module produces the **same** 232,263,298-byte zip (`sha256 58527cf3…`). The engineering
+top-level `cp.img` is single-chunk and passes; the retail one is two-chunk and fails —
+consistent with the single-chunk rule, not with a TA capability difference.
+
+Booting the engineering slot **switched the modem personality** to `wa520` (its
+`multi_type_default`): `pigeon_current_type` went `za530_lite` → `wa520`, the active
+`cp_nvram.bin` was replaced with `nvram_wa520`'s (sha256 `054d35ac…`), and the previous files
+were saved as `*_bak.bin`. Retail `29020` on return does **not** switch back (both values are
+in its 9-entry list, and `pair_auto_switch=0`), so plan a restore after any engineering-slot
+boot (see `MODEM_LOAD_CHAIN.md`).
 
 ---
 
