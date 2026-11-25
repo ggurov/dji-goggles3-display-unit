@@ -6,3 +6,7 @@ log_export/output/**
 !log_export/output/.gitkeep
 log_export/logutil_decrypt/obj/
 log_export/logutil_decrypt/libs/
+
+# Python bytecode (goggles_tool, log_export, retail_root)
+__pycache__/
+*.pyc
