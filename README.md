@@ -92,7 +92,6 @@ You must obtain and prepare these locally:
 |---|---|---|
 | Signed firmware package (IM\*H) | DJI Assistant 2 → downloads to `firm_cache\` while checking for updates | ~282 MB for v01.00.1300 |
 | Flashable partition images | Decrypt on-device, pull `ota.zip`, run `build_images.py` (see below) | ~840 MB total |
-| Python fix-up scripts (optional) | `add_novice_guidance.py`, `remove_hms_entry.py` — needed only for IMU-missing units | tiny |
 
 **v01.00.1300** firm_cache file (as of Jun 2026):
 
@@ -116,7 +115,8 @@ Internal name: `zv902_2805_v10.00.59.40_20260325.ar0.pro.fw.sig` (282,358,176 by
 | `set_active_slot.ps1` | Switch which A/B slot boots (via `unrd`) |
 | `flash_retail_v01_00_1300_to_inactive_slot.ps1` | Flash **v01.00.1300** to the inactive slot |
 | `flash_retail_to_inactive_slot.ps1` | Flash **v01.00.1000** (older; superseded) |
-| `post_flash_fixups.ps1` | Optional OOBE + sensor-error fixes for IMU-missing units |
+| `post_flash_fixups.ps1` | Optional OOBE + sensor-error fixes for IMU-missing units (**engineering units only**, see step 6) |
+| `add_novice_guidance.py`, `remove_hms_entry.py` | Helpers used by `post_flash_fixups.ps1` |
 | `install_donor_rc_local.ps1` | Install delayed RAM/GFSK hygiene hook |
 | `donor_rc.local` | Hygiene policy (installed to `/data/local/donor/rc.local`) |
 | `donor_boot_hook.sh` | Init wrapper for rc.local |
@@ -234,12 +234,14 @@ Some display units ship without the internal IMU/motion module. Symptoms:
 Skip this section if your unit has a working IMU.
 
 ```powershell
-.\post_flash_fixups.ps1 -DoHms -Execute -Tools .\tools -Adb adb
+.\post_flash_fixups.ps1 -DoHms -Execute -Adb adb
 adb reboot
 ```
 
-Requires `remove_hms_entry.py` and (for OOBE) `add_novice_guidance.py` in the
-`-Tools` directory.
+It uses `remove_hms_entry.py` and `add_novice_guidance.py` from this repository
+(`-Tools` overrides the directory). **Engineering units only:** the script refuses when
+`ro.boot.verity` is `1`, because a retail `/system` is dm-verity protected and would not
+boot after the edit ([`RETAIL_ROOT.md`](RETAIL_ROOT.md)).
 
 ### 7. Optional FPV hygiene + GFSK shutdown (IMU-less display units)
 
