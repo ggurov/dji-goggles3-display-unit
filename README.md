@@ -53,6 +53,12 @@ copyrighted binaries — you obtain those yourself from DJI Assistant 2.
    field flight: **46 min, video perfect** (flight0579, 2026-06-21). See
    [`DONOR_HYGIENE.md`](DONOR_HYGIENE.md).
 
+8. **A locked retail pair can get root ADB for a session.** One DUML frame on the USB bulk
+   pipe (`07/64`, the method [toolya](https://toolya.dev/app) uses) brings `adbd` up as
+   uid 0 on a stock retail unit, and nothing is written to flash. The same retail firmware
+   ships without ADB only because `/system/bin/setup_usb.sh` reads `secure_debug` and
+   `mp_state` from the production bootloader. See [`RETAIL_ROOT.md`](RETAIL_ROOT.md).
+
 ---
 
 ## What you need
@@ -63,7 +69,9 @@ copyrighted binaries — you obtain those yourself from DJI Assistant 2.
   consumer retail unit).
 - USB connection to a Windows PC.
 - The unit must already have **root ADB** (`adb shell id` → `uid=0`). If yours is a
-  locked retail pair, this procedure does not apply.
+  locked retail pair, this procedure does not apply: [`RETAIL_ROOT.md`](RETAIL_ROOT.md)
+  covers getting root on one, but the flash scripts were only ever run on engineering
+  units, and a retail `/system` is dm-verity protected.
 
 ### Software (host PC)
 
@@ -104,6 +112,7 @@ Internal name: `zv902_2805_v10.00.59.40_20260325.ar0.pro.fw.sig` (282,358,176 by
 | [`MANIFEST.md`](MANIFEST.md) | Image SHA1 table, `unrd` descriptor values, rebuild instructions |
 | [`DONOR_HYGIENE.md`](DONOR_HYGIENE.md) | RAM/GFSK shutdown + video blackout findings (optional, post-flash) |
 | [`AGENTS.md`](AGENTS.md) | Full technical brief for developers / AI agents |
+| [`RETAIL_ROOT.md`](RETAIL_ROOT.md) | Root ADB, permissive SELinux and RNDIS + ADB on a **locked retail** unit; how the V5 retail differs from V4 display units |
 | `set_active_slot.ps1` | Switch which A/B slot boots (via `unrd`) |
 | `flash_retail_v01_00_1300_to_inactive_slot.ps1` | Flash **v01.00.1300** to the inactive slot |
 | `flash_retail_to_inactive_slot.ps1` | Flash **v01.00.1000** (older; superseded) |
@@ -114,6 +123,7 @@ Internal name: `zv902_2805_v10.00.59.40_20260325.ar0.pro.fw.sig` (282,358,176 by
 | `dji_donor_hygiene.rc` | Init trigger on `dji.camera_service=1` |
 | [`log_export/`](log_export/) | **Retail bulk log pull + LOGH decrypt** (see below) |
 | [`goggles_tool/`](goggles_tool/) | USB bulk CLI (`pip install -e goggles_tool`) |
+| [`retail_root/`](retail_root/) | `enable_adb.py` (DUML ADB enable on a locked retail unit), kernel symbol and disassembly helpers |
 
 ---
 
@@ -318,6 +328,9 @@ firm_cache\95714dcbe1a9f75ee8dde5f84fbe27eb.cache
 - **[NETWORK_ATTACK_SURFACE.md](NETWORK_ATTACK_SURFACE.md)** — every listener on the USB network
   (ports, owners, root), verified wire formats, the unauthenticated I2C daemon, the 9003/8902
   session issues, and the one-packet `7400` DDS crash (DoS, not a controllable call)
+- **[RETAIL_ROOT.md](RETAIL_ROOT.md)** — root on a stock retail unit (the toolya DUML frame,
+  verified), SELinux permissive through `/dev/mem`, kernel symbols rebuilt from memory,
+  switching USB to RNDIS + ADB, and the V5 retail next to the V4 engineering donors
 - **[DONOR_HYGIENE.md](DONOR_HYGIENE.md)** — optional RAM/GFSK shutdown, video blackout
   mitigation, post-flight checklist
 - **[log_export/README.md](log_export/README.md)** — retail bulk log pull + LOGH decrypt

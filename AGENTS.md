@@ -1,12 +1,13 @@
 # DJI Goggles 3 ("Display Unit") Multi-Drone Compatibility — Agent Brief
 
-This file is the entry point for an agentic coding agent continuing this research.
-It summarizes what exists, what is known, what the next steps are, and the hard
-safety constraints. Read this file and `AI_SEED.txt` before acting.
+This file is the agent brief from the June 2026 phase of this research. It summarizes
+what existed then, what was known, the next steps, and the hard safety constraints. The
+findings published since then are the root-level docs listed in the README's "Further
+reading"; start with `RETAIL_ROOT.md` for the locked retail unit.
 
-> Source of truth for raw findings: `AI_SEED.txt` (original seed) +
-> `docs/findings.md` (live, kept up to date) + `docs/activity-log.md` (chronological).
-> This file adds structure, file/path index, and a prioritized work plan.
+> Raw notes: `AI_SEED.txt`, `docs/findings.md` and `docs/activity-log.md` belong to the
+> private research workspace and are not part of this repository. This file adds
+> structure, a file/path index for that workspace, and a prioritized work plan.
 
 ---
 
@@ -43,8 +44,19 @@ LOGH decrypt), `goggles_tool/` (USB bulk CLI).
 (`secure_debug=1`). Decrypt via NDK harness + `liblog_util.so` on donor. See
 `log_export/LOG_ENCRYPTION.md`, `log_export/BULK_PROTOCOL.md`.
 
-Phase 2 (open): add air units beyond retail via modem personality reverse; retail unit
-(no ADB) passive analysis only.
+Phase 2 (open): add air units beyond retail via modem personality reverse. Until
+2026-11-24 the retail unit was a passive analysis target only (no ADB).
+
+**Update 2026-11-24 (see `RETAIL_ROOT.md`):** the locked retail unit is a **V5** board with a
+production bootloader (`mp_state=production`, `secure_debug=0`, `verity=1`, SELinux enforcing,
+dm-verity mode 2 on `/system`) and no ADB in its stock USB config. Its slot 1 holds an older
+retail build (21787), not an engineering fallback. It gets root ADB for a session from one
+DUML frame (`07/64`, toolya's method) over MI_04, with nothing written to flash; from that
+shell SELinux can be made permissive through `/dev/mem` and USB switched to RNDIS + ADB.
+Findings that depend on the secure path (TA behaviour, `dji_fw_verify`, modem keys) were all
+obtained on the `secure_debug=1` engineering boards and are not automatically valid on a
+production unit. The November findings live in the root-level docs listed in the README's
+"Further reading".
 
 ---
 
@@ -614,9 +626,9 @@ These will mislead an agent if trusted blindly:
   approval first.
 - Keep new scripts parameterized (paths, interface) and non-interactive.
 - When regenerating reports, fix the `$line` interpolation bug rather than copying it.
-- Keep `docs/findings.md` and `docs/activity-log.md` current as you work; tag new
-  facts `[CONFIRMED]` / `[INFERRED]` / `[OPEN]`. AGENTS.md should be updated only
-  when phase boundaries change (e.g. Phase 2 milestones).
+- In the private research workspace, keep `docs/findings.md` and `docs/activity-log.md`
+  current as you work; tag new facts `[CONFIRMED]` / `[INFERRED]` / `[OPEN]`. AGENTS.md
+  should be updated only when phase boundaries change (e.g. Phase 2 milestones).
 - For any A/B-slot write: dry-run the slot detection first, write only the
   inactive slot, verify readback SHA1 against the host image, abort on any
   mismatch BEFORE flipping the active slot.

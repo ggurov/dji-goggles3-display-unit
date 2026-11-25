@@ -290,8 +290,13 @@ Caveat: the command-id → handler mapping is **behavioural**, not proven from t
 dispatch table is built at runtime in `.bss` (handler pointers arrive via
 `R_AARCH64_RELATIVE`), and there is no literal `cmp #0x65` anywhere.
 
-**Do not send `07/xx` on a unit you care about.** It mutates `sys.usb.config`, SELinux and the
-BT stack. Only `00/01` was sent in this research.
+**Update 2026-11-24:** `07/64` with payload `01` was then sent to a locked retail unit on
+build 29020, over interface 4. It is the ADB enable that toolya uses: the gadget comes back
+as `acm,adb` with `adbd` as uid 0, and nothing is written to flash. Details, the Windows
+driver prerequisite and the kernel address behind a permissive SELinux are in
+[RETAIL_ROOT.md](RETAIL_ROOT.md). `0x64` on this build is still an empirical result. Only
+send it knowing that it mutates `sys.usb.config`, SELinux and the BT stack until the next
+reboot.
 
 ---
 
