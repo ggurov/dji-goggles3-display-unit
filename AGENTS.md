@@ -334,8 +334,8 @@ and `E:\dji_g3` as defaults (the new `repro_kit/` scripts accept overrides via
   `0x1B200003` suppression for IMU-missing units.
 - `fw_patch/build_images.py`, `fw_patch/verify_imgs.py` — rebuild and verify the
   retail images from a fresh `ota.zip`.
-- `post_reset_tools/{add_novice_guidance.py,remove_hms_entry.py}` — primitives the
-  fix-up script wraps.
+- `add_novice_guidance.py`, `remove_hms_entry.py` (repository root) — primitives the
+  fix-up script wraps; it refuses the HMS edit on a dm-verity unit (`ro.boot.verity=1`).
 
 ### Legacy / one-shot (kept for provenance)
 

@@ -6,21 +6,26 @@
   1) OOBE unblock  - inserts novice_guidance=1 into /data/us.db so the setup
      wizard can move past the "passthrough goggles" screen.
   2) HMS suppression - removes 0x1B200003 from /system/etc/hms_errorcode_list.txt
-     so the "goggles sensor system error" capsule stops showing.
+     so the "goggles sensor system error" capsule stops showing. Engineering
+     units only: the script refuses when ro.boot.verity is 1, because a dm-verity
+     protected /system does not boot after an edit.
 
   Default is DRY-RUN. Pass -Execute to apply. Each step backs up the original.
+  The two helper scripts live next to this file (override with -Tools).
 #>
 [CmdletBinding()]
 param(
   [string]$Adb        = "C:\Users\ggurov\Downloads\platform-tools-latest-windows\platform-tools\adb.exe",
-  [string]$Tools      = "E:\dji_g3\post_reset_tools",
-  [string]$WorkRoot   = "E:\dji_g3\repro_kit\_runtime",
+  [string]$Tools,
+  [string]$WorkRoot,
   [string]$HmsCode    = "0x1B200003",
   [switch]$DoOobe,
   [switch]$DoHms,
   [switch]$Execute
 )
 $ErrorActionPreference = "Stop"
+if (-not $Tools)    { $Tools    = $PSScriptRoot }                          # $PSScriptRoot is empty inside param()
+if (-not $WorkRoot) { $WorkRoot = Join-Path $PSScriptRoot "_runtime" }    # scratch + backups, git-ignored
 if (-not $DoOobe -and -not $DoHms) { $DoOobe = $true; $DoHms = $true }
 $ts = Get-Date -Format "yyyyMMddHHmmss"
 $work = Join-Path $WorkRoot $ts
@@ -44,6 +49,10 @@ if ($DoOobe) {
 
 if ($DoHms) {
   Write-Host "== HMS capsule suppression ($HmsCode) ==" -ForegroundColor Cyan
+  $verity = (Sh "getprop ro.boot.verity").Trim()
+  if ($verity -eq "1") {
+    throw "ro.boot.verity=1: /system is dm-verity protected on this unit and does not boot after an edit. The HMS fix-up is for engineering units (verity=0) only."
+  }
   $f = "/system/etc/hms_errorcode_list.txt"
   & $Adb pull $f "$work\hms.orig" | Out-Null
   python "$Tools\remove_hms_entry.py" "$work\hms.orig" "$work\hms.patched" $HmsCode
