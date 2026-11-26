@@ -333,6 +333,10 @@ firm_cache\95714dcbe1a9f75ee8dde5f84fbe27eb.cache
 - **[RETAIL_ROOT.md](RETAIL_ROOT.md)** — root on a stock retail unit (the toolya DUML frame,
   verified), SELinux permissive through `/dev/mem`, kernel symbols rebuilt from memory,
   switching USB to RNDIS + ADB, and the V5 retail next to the V4 engineering donors
+- **[AIR_UNIT_FIRMWARE_UPDATE.md](AIR_UNIT_FIRMWARE_UPDATE.md)** — how DJI Assistant 2 updates
+  an O4 Air Unit (Pro and Lite) over USB: V1 frame layout and CRCs, hosts, the command
+  sequence, the MD5-checked file transfer, what the two sent files contain, where the packages
+  come from, and the host-side decoders in `assistant_update/`
 - **[DONOR_HYGIENE.md](DONOR_HYGIENE.md)** — optional RAM/GFSK shutdown, video blackout
   mitigation, post-flight checklist
 - **[log_export/README.md](log_export/README.md)** — retail bulk log pull + LOGH decrypt
