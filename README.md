@@ -337,6 +337,10 @@ firm_cache\95714dcbe1a9f75ee8dde5f84fbe27eb.cache
   an O4 Air Unit (Pro and Lite) over USB: V1 frame layout and CRCs, hosts, the command
   sequence, the MD5-checked file transfer, what the two sent files contain, where the packages
   come from, and the host-side decoders in `assistant_update/`
+- **[AIR_UNIT_USB_PROBES.md](AIR_UNIT_USB_PROBES.md)** — an O3 Air Unit on the wire: the DUML
+  host map, the `0x1d00` blackbox file service and its LOGH wrapping, the tombstones and core
+  dumps a command sweep silently leaves behind, the USB control requests that kill the port, and
+  why its FTP credentials stay inside the unit; tools in `air_unit_probe/`
 - **[DONOR_HYGIENE.md](DONOR_HYGIENE.md)** — optional RAM/GFSK shutdown, video blackout
   mitigation, post-flight checklist
 - **[log_export/README.md](log_export/README.md)** — retail bulk log pull + LOGH decrypt
